@@ -28,33 +28,3 @@ thumbnail-counter/
     └── app.js
 ```
 
-## Testing in VS Code
-
-1. Open the extracted `thumbnail-counter` folder in VS Code.
-2. Install the **Live Server** extension.
-3. Open `index.html`.
-4. Click **Go Live** or choose **Open with Live Server**.
-5. In the site, click **Edit mode** and drag a counter by its dark upper area.
-
-You can also use Python from the VS Code terminal:
-
-```bash
-python -m http.server 8000
-```
-
-Then open `http://localhost:8000`.
-
-## Important after updating
-
-Use `Ctrl + F5` in the browser to force a full refresh. Existing saved counter positions are automatically migrated to the full-screen coordinate system.
-
-## Correção de arraste próxima ao cabeçalho
-
-As áreas transparentes do cabeçalho e da linha de status não bloqueiam mais o mouse. Somente o título e os botões visíveis recebem cliques, e o contador ativo passa visualmente sobre o cabeçalho durante o arraste.
-
-- A logo `assets/logo-jl.svg` é exibida centralizada no fundo como marca d’água.
-
-
-## Position persistence
-
-Counter positions are stored as relative viewport coordinates. A counter placed on the right side remains on the right after refreshing or resizing the browser window.
