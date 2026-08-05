@@ -99,10 +99,12 @@ Git e GitHub
 Estrutura do projeto
 
 
+<pre>
+.
 ├── assets/
 │   ├── favicon.png
 │   ├── favicon.svg
-│   └── logo.svg
+│   └── logo-jl.svg
 ├── css/
 │   └── styles.css
 ├── js/
@@ -115,3 +117,4 @@ Estrutura do projeto
 ├── netlify.toml
 ├── package.json
 └── README.md
+</pre>
