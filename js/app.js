@@ -15,10 +15,10 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
   const COORDINATE_SPACE = 'viewport-relative-v2';
   const PREVIOUS_VIEWPORT_SPACE = 'viewport-v1';
   const LEGACY_BOARD_WIDTH = 1120;
-  const BOARD_PADDING = 10;
-  const CARD_WIDTH = 140;
-  const CARD_HEIGHT = 190;
-  const CARD_GAP = 16;
+  const DEFAULT_BOARD_PADDING = 10;
+  const DEFAULT_CARD_WIDTH = 140;
+  const DEFAULT_CARD_HEIGHT = 150;
+  const DEFAULT_CARD_GAP = 16;
 
   const starterCounters = [
     { name: 'SIXRING', goal: 10, value: 8, color: '#f5a900' },
@@ -103,31 +103,50 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
+  function readCssPixelVariable(name, fallback) {
+    const rawValue = getComputedStyle(document.documentElement).getPropertyValue(name);
+    const parsedValue = Number.parseFloat(rawValue);
+    return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
+  }
+
+  function getCardMetrics(card = null) {
+    return {
+      width: card?.offsetWidth || readCssPixelVariable('--card-width', DEFAULT_CARD_WIDTH),
+      height: card?.offsetHeight || readCssPixelVariable('--card-height', DEFAULT_CARD_HEIGHT),
+      gap: readCssPixelVariable('--card-gap', DEFAULT_CARD_GAP),
+      padding: readCssPixelVariable('--board-padding', DEFAULT_BOARD_PADDING)
+    };
+  }
+
   function getViewportWidth() {
-    return Math.max(document.documentElement.clientWidth, window.innerWidth || 0, CARD_WIDTH);
+    const { width } = getCardMetrics();
+    return Math.max(document.documentElement.clientWidth, window.innerWidth || 0, width);
   }
 
   function getViewportHeight() {
-    return Math.max(document.documentElement.clientHeight, window.innerHeight || 0, CARD_HEIGHT);
+    const { height } = getCardMetrics();
+    return Math.max(document.documentElement.clientHeight, window.innerHeight || 0, height);
   }
 
   function getSafeTop() {
+    const { height, padding } = getCardMetrics();
     const statusBottom = elements.statusRow?.getBoundingClientRect().bottom || 130;
     return Math.min(
-      Math.max(BOARD_PADDING, Math.round(statusBottom + 12)),
-      Math.max(BOARD_PADDING, getViewportHeight() - CARD_HEIGHT)
+      Math.max(padding, Math.round(statusBottom + 12)),
+      Math.max(padding, getViewportHeight() - height)
     );
   }
 
   function getInitialPosition(index) {
     const viewportWidth = getViewportWidth();
     const safeTop = getSafeTop();
-    const usableWidth = Math.max(CARD_WIDTH, viewportWidth - (BOARD_PADDING * 2));
-    const columns = Math.max(1, Math.floor((usableWidth + CARD_GAP) / (CARD_WIDTH + CARD_GAP)));
+    const { width, height, gap, padding } = getCardMetrics();
+    const usableWidth = Math.max(width, viewportWidth - (padding * 2));
+    const columns = Math.max(1, Math.floor((usableWidth + gap) / (width + gap)));
 
     return {
-      x: BOARD_PADDING + (index % columns) * (CARD_WIDTH + CARD_GAP),
-      y: safeTop + Math.floor(index / columns) * (CARD_HEIGHT + CARD_GAP)
+      x: padding + (index % columns) * (width + gap),
+      y: safeTop + Math.floor(index / columns) * (height + gap)
     };
   }
 
@@ -171,8 +190,9 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
     const parsedXRatio = parseFiniteNumber(counter.xRatio);
     const parsedYRatio = parseFiniteNumber(counter.yRatio);
     const parsedZ = Number(counter.z);
-    const maxX = Math.max(0, getViewportWidth() - CARD_WIDTH);
-    const maxY = Math.max(0, getViewportHeight() - CARD_HEIGHT);
+    const { width, height } = getCardMetrics();
+    const maxX = Math.max(0, getViewportWidth() - width);
+    const maxY = Math.max(0, getViewportHeight() - height);
     const fallbackX = Math.round(clamp(fallbackPosition.x, 0, maxX));
     const fallbackY = Math.round(clamp(fallbackPosition.y, 0, maxY));
     const pixelX = Number.isFinite(parsedX) && parsedX >= 0
@@ -462,8 +482,7 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
   }
 
   function getMovementBounds(card) {
-    const cardWidth = card?.offsetWidth || CARD_WIDTH;
-    const cardHeight = card?.offsetHeight || CARD_HEIGHT;
+    const { width: cardWidth, height: cardHeight } = getCardMetrics(card);
 
     return {
       maxX: Math.max(0, getViewportWidth() - cardWidth),
@@ -602,12 +621,12 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
     elements.counterForm.reset();
   }
 
-  function boxesOverlap(a, b) {
+  function boxesOverlap(a, b, gap) {
     return !(
-      a.x + a.width + CARD_GAP <= b.x ||
-      b.x + b.width + CARD_GAP <= a.x ||
-      a.y + a.height + CARD_GAP <= b.y ||
-      b.y + b.height + CARD_GAP <= a.y
+      a.x + a.width + gap <= b.x ||
+      b.x + b.width + gap <= a.x ||
+      a.y + a.height + gap <= b.y ||
+      b.y + b.height + gap <= a.y
     );
   }
 
@@ -615,41 +634,42 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
     const viewportWidth = getViewportWidth();
     const viewportHeight = getViewportHeight();
     const safeTop = getSafeTop();
-    const maxX = Math.max(0, viewportWidth - CARD_WIDTH);
-    const maxY = Math.max(0, viewportHeight - CARD_HEIGHT);
+    const { width, height, gap, padding } = getCardMetrics();
+    const maxX = Math.max(0, viewportWidth - width);
+    const maxY = Math.max(0, viewportHeight - height);
     const columns = Math.max(
       1,
-      Math.floor((viewportWidth - (BOARD_PADDING * 2) + CARD_GAP) / (CARD_WIDTH + CARD_GAP))
+      Math.floor((viewportWidth - (padding * 2) + gap) / (width + gap))
     );
 
     const occupied = state.counters.map((counter) => ({
       x: counter.x,
       y: counter.y,
-      width: CARD_WIDTH,
-      height: CARD_HEIGHT
+      width,
+      height
     }));
 
     for (let slot = 0; slot < 500; slot += 1) {
-      const candidateX = BOARD_PADDING + (slot % columns) * (CARD_WIDTH + CARD_GAP);
-      const candidateY = safeTop + Math.floor(slot / columns) * (CARD_HEIGHT + CARD_GAP);
+      const candidateX = padding + (slot % columns) * (width + gap);
+      const candidateY = safeTop + Math.floor(slot / columns) * (height + gap);
 
       if (candidateY > maxY) break;
 
       const candidate = {
         x: clamp(candidateX, 0, maxX),
         y: clamp(candidateY, 0, maxY),
-        width: CARD_WIDTH,
-        height: CARD_HEIGHT
+        width,
+        height
       };
 
-      if (!occupied.some((box) => boxesOverlap(candidate, box))) {
+      if (!occupied.some((box) => boxesOverlap(candidate, box, gap))) {
         return { x: candidate.x, y: candidate.y };
       }
     }
 
     const cascadeOffset = (state.counters.length * 28) % Math.max(28, Math.min(280, maxX + 1));
     return {
-      x: clamp(BOARD_PADDING + cascadeOffset, 0, maxX),
+      x: clamp(padding + cascadeOffset, 0, maxX),
       y: clamp(safeTop + cascadeOffset, 0, maxY)
     };
   }
@@ -743,6 +763,7 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
   }
 
   function beginDrag(event, id, card) {
+    if (event.isPrimary === false) return;
     if (event.target.closest('button')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
 
@@ -1188,12 +1209,23 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
     if (event.key === 'Escape' && elements.counterDialog.open) closeCounterDialog();
   });
 
-  window.addEventListener('resize', () => {
-    for (const card of elements.counterGrid.querySelectorAll('.counter-card')) {
-      const counter = state.counters.find((item) => item.id === card.dataset.id);
-      if (counter) restoreCardPosition(card, counter);
-    }
-  });
+  let viewportResizeTimer = null;
+
+  function repositionCardsForViewport() {
+    if (dragState || elements.counterDialog.open) return;
+
+    window.clearTimeout(viewportResizeTimer);
+    viewportResizeTimer = window.setTimeout(() => {
+      for (const card of elements.counterGrid.querySelectorAll('.counter-card')) {
+        const counter = state.counters.find((item) => item.id === card.dataset.id);
+        if (counter) restoreCardPosition(card, counter);
+      }
+    }, 140);
+  }
+
+  window.addEventListener('resize', repositionCardsForViewport, { passive: true });
+  window.addEventListener('orientationchange', repositionCardsForViewport, { passive: true });
+  window.visualViewport?.addEventListener('resize', repositionCardsForViewport, { passive: true });
 
   window.addEventListener('focus', pullCloudState);
   document.addEventListener('visibilitychange', () => {

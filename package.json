@@ -1,9 +1,9 @@
 {
   "name": "thumbnail-counter-users",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
-  "description": "Editable thumbnail counter with private user accounts and cross-device synchronization on Netlify.",
+  "description": "Responsive editable thumbnail counter with private user accounts and cross-device synchronization on Netlify.",
   "scripts": {
     "dev": "netlify dev"
   },

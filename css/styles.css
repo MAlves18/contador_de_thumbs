@@ -9,6 +9,9 @@
   --shadow: 0 14px 30px rgba(5, 9, 16, 0.28);
   --radius: 10px;
   --card-width: 140px;
+  --card-height: 150px;
+  --card-gap: 16px;
+  --board-padding: 10px;
   --board-bg: #ffffff;
   --grid-minor: rgba(15, 23, 42, 0.075);
   --grid-major: rgba(15, 23, 42, 0.14);
@@ -48,7 +51,9 @@ body {
   width: 100%;
   height: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
+  overscroll-behavior: none;
   margin: 0;
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -99,6 +104,7 @@ input:focus-visible,
   z-index: 1;
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   margin: 0;
   padding: 14px 16px;
   overflow: hidden;
@@ -205,6 +211,7 @@ body.edit-mode .title-badge span {
   z-index: 10;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   margin: 0;
   border-radius: 0;
   pointer-events: none;
@@ -818,4 +825,455 @@ body.edit-mode .counter-card__edit-actions {
   width: 20px;
   height: 20px;
   flex: 0 0 auto;
+}
+
+
+/* Responsive layout refinements */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body,
+.app-shell,
+.counter-board {
+  min-height: 100dvh;
+}
+
+button,
+.file-btn,
+.counter-card {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+.file-btn {
+  touch-action: manipulation;
+}
+
+.app-shell {
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  padding-left: max(12px, env(safe-area-inset-left));
+}
+
+.app-header,
+.status-row {
+  width: min(1180px, calc(100vw - 24px));
+  margin-inline: auto;
+}
+
+.toolbar {
+  max-width: 100%;
+}
+
+.counter-card {
+  contain: layout style;
+}
+
+.counter-card__screen {
+  min-width: 0;
+}
+
+.counter-card__title {
+  hyphens: auto;
+}
+
+@media (min-width: 1600px) and (min-height: 850px) {
+  :root {
+    --card-width: 150px;
+    --card-height: 158px;
+    --card-gap: 18px;
+    --board-padding: 14px;
+  }
+
+  .counter-card {
+    min-height: 158px;
+    padding: 13px;
+  }
+
+  .counter-card__screen {
+    min-height: 102px;
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --card-width: 136px;
+    --card-height: 145px;
+    --card-gap: 14px;
+    --board-padding: 9px;
+  }
+
+  body {
+    background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  }
+
+  .app-header {
+    gap: 10px;
+  }
+
+  .title-badge {
+    min-height: 38px;
+    border-width: 5px;
+  }
+
+  .toolbar-btn,
+  .file-btn {
+    min-height: 40px;
+    padding: 8px 11px;
+  }
+
+  .status-row {
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --card-width: 124px;
+    --card-height: 132px;
+    --card-gap: 10px;
+    --board-padding: 8px;
+  }
+
+  body {
+    background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;
+  }
+
+  .app-shell {
+    padding-top: max(7px, env(safe-area-inset-top));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: max(7px, env(safe-area-inset-bottom));
+    padding-left: max(8px, env(safe-area-inset-left));
+  }
+
+  .app-header,
+  .status-row {
+    width: 100%;
+  }
+
+  .app-header {
+    gap: 7px;
+  }
+
+  .title-badge {
+    min-height: 34px;
+    max-width: calc(100vw - 24px);
+    padding: 4px 10px;
+    border-width: 4px;
+  }
+
+  .title-badge span {
+    max-width: calc(100vw - 52px);
+    overflow: hidden;
+    font-size: clamp(.88rem, 4.5vw, 1.12rem);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    width: 100%;
+    max-width: 100%;
+    gap: 7px;
+    padding: 1px 2px 5px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .toolbar-btn,
+  .file-btn {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: max-content;
+    min-height: 42px;
+    padding: 8px 12px;
+    scroll-snap-align: start;
+    font-size: .82rem;
+  }
+
+  .user-bar {
+    width: 100%;
+    min-height: 40px;
+    justify-content: space-between;
+    padding: 5px 6px 5px 10px;
+    border-radius: 10px;
+  }
+
+  .user-bar span {
+    max-width: calc(100vw - 112px);
+  }
+
+  .toolbar-btn.compact {
+    width: auto;
+    min-width: auto;
+    min-height: 32px;
+    padding: 5px 9px;
+    font-size: .72rem;
+  }
+
+  .status-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    margin: 7px auto 0;
+    padding: 5px 8px;
+    border: 1px solid var(--board-outline);
+    border-radius: 8px;
+    background: var(--board-glass);
+    backdrop-filter: blur(8px);
+    font-size: .7rem;
+    line-height: 1.25;
+  }
+
+  .status-row p {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .status-row p:last-child {
+    text-align: right;
+  }
+
+  .counter-card {
+    min-height: 132px;
+    padding: 8px;
+    border-radius: 8px;
+  }
+
+  .counter-card__screen {
+    min-height: 84px;
+    padding: 8px 6px 6px;
+  }
+
+  .counter-card__title {
+    font-size: .64rem;
+  }
+
+  .counter-card__value {
+    font-size: clamp(1.8rem, 10vw, 2.35rem);
+  }
+
+  .count-btn {
+    min-height: 40px;
+    font-size: 1.18rem;
+  }
+
+  .small-action {
+    min-height: 36px;
+    font-size: .63rem;
+  }
+
+  .empty-state {
+    width: calc(100% - 12px);
+    margin-top: 32px;
+    padding: 24px 16px;
+  }
+
+  .counter-dialog {
+    inset: auto 0 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(88dvh, 720px);
+    margin: 0;
+    border-radius: 18px 18px 0 0;
+    overflow: auto;
+  }
+
+  .counter-dialog form {
+    gap: 14px;
+    padding: 20px max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+
+  .counter-dialog input,
+  .auth-form input {
+    font-size: 16px;
+  }
+
+  .dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dialog-actions .toolbar-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .auth-gate {
+    place-items: start center;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 430px;
+    margin-block: auto;
+    padding: 22px 16px;
+    border-radius: 15px;
+  }
+
+  .auth-logo {
+    width: min(145px, 45vw);
+    max-height: 84px;
+    margin-bottom: 10px;
+  }
+
+  .auth-card h1 {
+    font-size: clamp(1.45rem, 7vw, 1.85rem);
+  }
+
+  .auth-intro {
+    margin-bottom: 18px;
+  }
+}
+
+@media (max-width: 400px) {
+  :root {
+    --card-width: 112px;
+    --card-height: 122px;
+    --card-gap: 8px;
+    --board-padding: 6px;
+  }
+
+  .toolbar-btn,
+  .file-btn {
+    min-height: 40px;
+    padding-inline: 10px;
+    font-size: .76rem;
+  }
+
+  .status-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .status-row p:last-child {
+    text-align: left;
+  }
+
+  .counter-card {
+    min-height: 122px;
+    padding: 7px;
+  }
+
+  .counter-card__screen {
+    min-height: 76px;
+    padding-inline: 5px;
+  }
+
+  .counter-card__title {
+    font-size: .58rem;
+  }
+
+  .counter-card__value {
+    font-size: 1.86rem;
+  }
+
+  .count-btn {
+    min-height: 38px;
+  }
+}
+
+@media (max-height: 560px) and (orientation: landscape) {
+  :root {
+    --card-width: 118px;
+    --card-height: 118px;
+    --card-gap: 8px;
+    --board-padding: 6px;
+  }
+
+  .app-shell {
+    padding-top: max(5px, env(safe-area-inset-top));
+  }
+
+  .app-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .title-badge {
+    min-height: 30px;
+    padding: 2px 8px;
+    border-width: 3px;
+  }
+
+  .title-badge span {
+    max-width: 27vw;
+    font-size: .78rem;
+  }
+
+  .toolbar {
+    width: 100%;
+    padding-bottom: 2px;
+  }
+
+  .toolbar-btn,
+  .file-btn {
+    min-height: 34px;
+    padding: 6px 9px;
+    font-size: .7rem;
+  }
+
+  .user-bar {
+    width: auto;
+    min-height: 34px;
+    padding-block: 3px;
+  }
+
+  .user-bar span {
+    max-width: 18vw;
+  }
+
+  .status-row {
+    margin-top: 4px;
+    padding: 3px 7px;
+  }
+
+  .counter-card {
+    min-height: 118px;
+    padding: 7px;
+  }
+
+  .counter-card__screen {
+    min-height: 74px;
+    padding: 6px 5px 4px;
+  }
+
+  .count-btn {
+    min-height: 34px;
+  }
+}
+
+@media (hover: none) {
+  .toolbar-btn:hover,
+  .file-btn:hover,
+  .google-login-btn:hover,
+  .counter-card:hover {
+    transform: none;
+  }
+
+  .counter-card.is-dragging,
+  .counter-card.is-dragging:hover {
+    transform: scale(1.025);
+  }
 }
