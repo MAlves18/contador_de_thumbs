@@ -1,10 +1,14 @@
+import { acceptInvite, getUser, handleAuthCallback, login, logout, requestPasswordRecovery, signup, updateUser } from 'https://cdn.jsdelivr.net/npm/@netlify/identity@1.2.0/+esm';
+
 (() => {
   'use strict';
 
-  const STORAGE_KEY = 'thumbnail-counter-state-v1';
-  const CLOUD_KEY_STORAGE = 'thumbnail-counter-cloud-key-v1';
-  const CLOUD_REVISION_STORAGE = 'thumbnail-counter-cloud-revision-v1';
-  const CLOUD_PENDING_STORAGE = 'thumbnail-counter-cloud-pending-v1';
+  const LEGACY_STORAGE_KEY = 'thumbnail-counter-state-v1';
+  const USER_STORAGE_PREFIX = 'thumbnail-counter-user-v2';
+  const LEGACY_MIGRATION_MARKER = 'thumbnail-counter-legacy-migrated-v2';
+  let storageKey = '';
+  let cloudRevisionStorage = '';
+  let cloudPendingStorage = '';
   const CLOUD_ENDPOINT = '/api/board-state';
   const CLOUD_SAVE_DELAY_MS = 450;
   const CLOUD_POLL_INTERVAL_MS = 15000;
@@ -29,12 +33,34 @@
   ];
 
   const elements = {
+    authGate: document.querySelector('#authGate'),
+    authIntro: document.querySelector('#authIntro'),
+    authMessage: document.querySelector('#authMessage'),
+    loginForm: document.querySelector('#loginForm'),
+    loginEmail: document.querySelector('#loginEmail'),
+    loginPassword: document.querySelector('#loginPassword'),
+    forgotPasswordBtn: document.querySelector('#forgotPasswordBtn'),
+    signupForm: document.querySelector('#signupForm'),
+    signupName: document.querySelector('#signupName'),
+    signupEmail: document.querySelector('#signupEmail'),
+    signupPassword: document.querySelector('#signupPassword'),
+    recoveryForm: document.querySelector('#recoveryForm'),
+    recoveryEmail: document.querySelector('#recoveryEmail'),
+    resetPasswordForm: document.querySelector('#resetPasswordForm'),
+    resetPassword: document.querySelector('#resetPassword'),
+    resetPasswordConfirm: document.querySelector('#resetPasswordConfirm'),
+    inviteForm: document.querySelector('#inviteForm'),
+    invitePassword: document.querySelector('#invitePassword'),
+    invitePasswordConfirm: document.querySelector('#invitePasswordConfirm'),
+    toggleAuthModeBtn: document.querySelector('#toggleAuthModeBtn'),
+    appShell: document.querySelector('#appShell'),
+    currentUserName: document.querySelector('#currentUserName'),
+    logoutBtn: document.querySelector('#logoutBtn'),
     appTitle: document.querySelector('#appTitle'),
     addCounterBtn: document.querySelector('#addCounterBtn'),
     emptyAddBtn: document.querySelector('#emptyAddBtn'),
     editModeBtn: document.querySelector('#editModeBtn'),
     resetAllBtn: document.querySelector('#resetAllBtn'),
-    cloudSyncBtn: document.querySelector('#cloudSyncBtn'),
     exportBtn: document.querySelector('#exportBtn'),
     importInput: document.querySelector('#importInput'),
     counterGrid: document.querySelector('#counterGrid'),
@@ -55,16 +81,18 @@
     template: document.querySelector('#counterCardTemplate')
   };
 
+  let currentUser = null;
+  let authMode = 'login';
+  let pendingInviteToken = '';
   let needsMigrationSave = false;
-  let state = loadState();
+  let state = cloneDefaultState();
   let dragState = null;
-  let cloudSyncKey = localStorage.getItem(CLOUD_KEY_STORAGE) || '';
-  let cloudRevision = Number(localStorage.getItem(CLOUD_REVISION_STORAGE)) || 0;
+  let cloudRevision = 0;
   let cloudReady = false;
   let cloudSaveTimer = null;
   let cloudPollTimer = null;
   let cloudRequestInFlight = false;
-  let cloudPending = localStorage.getItem(CLOUD_PENDING_STORAGE) === '1';
+  let cloudPending = false;
   let localChangeVersion = 0;
 
   function createId() {
@@ -175,9 +203,24 @@
     };
   }
 
+  function configureUserStorage(user) {
+    const userId = String(user?.id || '').trim();
+    storageKey = `${USER_STORAGE_PREFIX}:state:${userId}`;
+    cloudRevisionStorage = `${USER_STORAGE_PREFIX}:revision:${userId}`;
+    cloudPendingStorage = `${USER_STORAGE_PREFIX}:pending:${userId}`;
+
+    if (!localStorage.getItem(storageKey) && !localStorage.getItem(LEGACY_MIGRATION_MARKER)) {
+      const legacyState = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacyState) {
+        localStorage.setItem(storageKey, legacyState);
+      }
+      localStorage.setItem(LEGACY_MIGRATION_MARKER, '1');
+    }
+  }
+
   function loadState() {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = storageKey ? localStorage.getItem(storageKey) : null;
       if (!saved) return cloneDefaultState();
 
       const parsed = JSON.parse(saved);
@@ -206,27 +249,24 @@
 
   function setCloudPending(value) {
     cloudPending = Boolean(value);
-    if (cloudPending) {
-      localStorage.setItem(CLOUD_PENDING_STORAGE, '1');
-    } else {
-      localStorage.removeItem(CLOUD_PENDING_STORAGE);
-    }
-  }
+    if (!cloudPendingStorage) return;
 
-  function updateCloudButton() {
-    const connected = Boolean(cloudSyncKey && cloudReady);
-    elements.cloudSyncBtn.textContent = connected ? 'Cloud: on' : 'Cloud sync';
-    elements.cloudSyncBtn.setAttribute('aria-pressed', String(connected));
-    elements.cloudSyncBtn.classList.toggle('cloud-connected', connected);
+    if (cloudPending) {
+      localStorage.setItem(cloudPendingStorage, '1');
+    } else {
+      localStorage.removeItem(cloudPendingStorage);
+    }
   }
 
   function saveState(message = 'Saved automatically', options = {}) {
     const { skipCloud = false } = options;
+    if (!currentUser || !storageKey) return;
+
     state.coordinateSpace = COORDINATE_SPACE;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(storageKey, JSON.stringify(state));
     elements.saveStatus.textContent = message;
 
-    if (!skipCloud && cloudSyncKey) {
+    if (!skipCloud) {
       localChangeVersion += 1;
       setCloudPending(true);
       if (cloudReady) scheduleCloudSave();
@@ -257,9 +297,9 @@
       const response = await fetch(CLOUD_ENDPOINT, {
         method,
         headers: {
-          'Content-Type': 'application/json',
-          'X-Sync-Key': cloudSyncKey
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: body ? JSON.stringify(body) : null,
         cache: 'no-store',
         signal: controller.signal
@@ -279,14 +319,14 @@
   }
 
   function scheduleCloudSave() {
-    if (!cloudSyncKey || !cloudReady) return;
+    if (!currentUser || !cloudReady) return;
     window.clearTimeout(cloudSaveTimer);
     cloudSaveTimer = window.setTimeout(() => pushCloudState(), CLOUD_SAVE_DELAY_MS);
     elements.saveStatus.textContent = 'Saving to cloud…';
   }
 
   async function pushCloudState() {
-    if (!cloudSyncKey || !cloudReady || !cloudPending) return;
+    if (!currentUser || !cloudReady || !cloudPending) return;
     if (cloudRequestInFlight) {
       scheduleCloudSave();
       return;
@@ -307,7 +347,7 @@
       });
 
       cloudRevision = Number(result.revision) || cloudRevision;
-      localStorage.setItem(CLOUD_REVISION_STORAGE, String(cloudRevision));
+      localStorage.setItem(cloudRevisionStorage, String(cloudRevision));
 
       if (localChangeVersion === versionBeingSaved) {
         setCloudPending(false);
@@ -318,12 +358,14 @@
       }
     } catch (error) {
       console.warn('Cloud save failed:', error);
-      elements.saveStatus.textContent = error.status === 401
-        ? 'Cloud password rejected'
-        : 'Saved here · retrying cloud sync';
-      if (error.status !== 401 && cloudSyncKey && cloudReady) {
-        window.clearTimeout(cloudSaveTimer);
-        cloudSaveTimer = window.setTimeout(pushCloudState, 5000);
+      if (error.status === 401) {
+        showSignedOutState('Your session expired. Sign in again.');
+      } else {
+        elements.saveStatus.textContent = 'Saved here · retrying cloud sync';
+        if (currentUser && cloudReady) {
+          window.clearTimeout(cloudSaveTimer);
+          cloudSaveTimer = window.setTimeout(pushCloudState, 5000);
+        }
       }
     } finally {
       cloudRequestInFlight = false;
@@ -331,7 +373,7 @@
   }
 
   async function pullCloudState() {
-    if (!cloudSyncKey || !cloudReady || cloudRequestInFlight || cloudPending) return;
+    if (!currentUser || !cloudReady || cloudRequestInFlight || cloudPending) return;
     if (dragState || elements.counterDialog.open || document.hidden) return;
 
     cloudRequestInFlight = true;
@@ -342,16 +384,18 @@
       if (result.found && result.state && remoteRevision > cloudRevision) {
         state = normalizeExternalState(result.state);
         cloudRevision = remoteRevision;
-        localStorage.setItem(CLOUD_REVISION_STORAGE, String(cloudRevision));
+        localStorage.setItem(cloudRevisionStorage, String(cloudRevision));
         saveState('Updated from cloud', { skipCloud: true });
         render();
         elements.saveStatus.textContent = 'Updated from another device';
       }
     } catch (error) {
       console.warn('Cloud refresh failed:', error);
-      elements.saveStatus.textContent = error.status === 401
-        ? 'Cloud password rejected'
-        : 'Cloud temporarily unavailable';
+      if (error.status === 401) {
+        showSignedOutState('Your session expired. Sign in again.');
+      } else {
+        elements.saveStatus.textContent = 'Cloud temporarily unavailable';
+      }
     } finally {
       cloudRequestInFlight = false;
     }
@@ -363,18 +407,16 @@
   }
 
   async function initializeCloudSync() {
-    updateCloudButton();
-    if (!cloudSyncKey || cloudRequestInFlight) return;
+    if (!currentUser || cloudRequestInFlight) return;
 
     cloudReady = false;
     cloudRequestInFlight = true;
-    elements.saveStatus.textContent = 'Connecting to cloud…';
+    elements.saveStatus.textContent = 'Connecting to your private cloud…';
 
     try {
       const result = await cloudRequest('GET');
       cloudRequestInFlight = false;
       cloudReady = true;
-      updateCloudButton();
 
       if (result.found && result.state) {
         if (cloudPending) {
@@ -382,10 +424,10 @@
         } else {
           state = normalizeExternalState(result.state);
           cloudRevision = Number(result.revision) || 0;
-          localStorage.setItem(CLOUD_REVISION_STORAGE, String(cloudRevision));
+          localStorage.setItem(cloudRevisionStorage, String(cloudRevision));
           saveState('Loaded from cloud', { skipCloud: true });
           render();
-          elements.saveStatus.textContent = 'Cloud data loaded';
+          elements.saveStatus.textContent = 'Private dashboard loaded';
         }
       } else {
         setCloudPending(true);
@@ -396,48 +438,21 @@
     } catch (error) {
       cloudRequestInFlight = false;
       cloudReady = false;
-      updateCloudButton();
       console.warn('Cloud connection failed:', error);
-      elements.saveStatus.textContent = error.status === 401
-        ? 'Cloud password rejected — click Cloud sync'
-        : 'Local mode · cloud not configured';
+
+      if (error.status === 401) {
+        showSignedOutState('Your session expired. Sign in again.');
+      } else {
+        elements.saveStatus.textContent = 'Saved on this device · cloud unavailable';
+      }
     }
   }
 
-  function disconnectCloudSync() {
-    cloudSyncKey = '';
+  function stopCloudSync() {
     cloudReady = false;
-    cloudRevision = 0;
+    cloudRequestInFlight = false;
     window.clearTimeout(cloudSaveTimer);
     window.clearInterval(cloudPollTimer);
-    localStorage.removeItem(CLOUD_KEY_STORAGE);
-    localStorage.removeItem(CLOUD_REVISION_STORAGE);
-    setCloudPending(false);
-    updateCloudButton();
-    elements.saveStatus.textContent = 'Cloud disconnected · saved on this device';
-  }
-
-  async function configureCloudSync() {
-    const promptText = cloudSyncKey
-      ? 'Enter a new cloud sync password. Leave blank to disconnect this device.'
-      : 'Enter the cloud sync password configured in Netlify.';
-    const nextKey = window.prompt(promptText);
-    if (nextKey === null) return;
-
-    const cleanedKey = nextKey.trim();
-    if (!cleanedKey) {
-      disconnectCloudSync();
-      return;
-    }
-
-    cloudSyncKey = cleanedKey;
-    cloudRevision = 0;
-    cloudReady = false;
-    setCloudPending(false);
-    localStorage.setItem(CLOUD_KEY_STORAGE, cloudSyncKey);
-    localStorage.removeItem(CLOUD_REVISION_STORAGE);
-    updateCloudButton();
-    await initializeCloudSync();
   }
 
   function clamp(value, minimum, maximum) {
@@ -512,15 +527,12 @@
 
     const total = state.counters.reduce((sum, counter) => sum + counter.value, 0);
     elements.summaryText.textContent = `${state.counters.length} counter${state.counters.length === 1 ? '' : 's'} · ${total} total`;
-    updateCloudButton();
     if (state.editMode) {
       elements.saveStatus.textContent = 'Edit mode: drag counters anywhere on the screen';
-    } else if (cloudSyncKey && cloudReady) {
+    } else if (cloudReady) {
       elements.saveStatus.textContent = cloudPending ? 'Saving to cloud…' : 'Synced across devices';
-    } else if (cloudSyncKey) {
-      elements.saveStatus.textContent = 'Connecting to cloud…';
     } else {
-      elements.saveStatus.textContent = 'Saved on this device';
+      elements.saveStatus.textContent = 'Connecting to your private cloud…';
     }
 
     if (needsMigrationSave) {
@@ -873,17 +885,281 @@
     render();
   }
 
+  function setAuthMessage(message = '', type = '') {
+    elements.authMessage.textContent = message;
+    elements.authMessage.classList.toggle('is-error', type === 'error');
+    elements.authMessage.classList.toggle('is-success', type === 'success');
+  }
+
+  function setAuthMode(mode) {
+    const allowedModes = new Set(['login', 'signup', 'recovery', 'reset', 'invite']);
+    authMode = allowedModes.has(mode) ? mode : 'login';
+
+    elements.loginForm.hidden = authMode !== 'login';
+    elements.signupForm.hidden = authMode !== 'signup';
+    elements.recoveryForm.hidden = authMode !== 'recovery';
+    elements.resetPasswordForm.hidden = authMode !== 'reset';
+    elements.inviteForm.hidden = authMode !== 'invite';
+
+    const content = {
+      login: {
+        intro: 'Sign in to access your counters on any device.',
+        link: 'Create a new account'
+      },
+      signup: {
+        intro: 'Create an account to keep a private dashboard synchronized across devices.',
+        link: 'I already have an account'
+      },
+      recovery: {
+        intro: 'Enter your email and Netlify will send a password recovery link.',
+        link: 'Back to sign in'
+      },
+      reset: {
+        intro: 'Choose a new password for your account.',
+        link: ''
+      },
+      invite: {
+        intro: 'Your invitation is valid. Create a password to activate the account.',
+        link: 'Back to sign in'
+      }
+    }[authMode];
+
+    elements.authIntro.textContent = content.intro;
+    elements.toggleAuthModeBtn.textContent = content.link;
+    elements.toggleAuthModeBtn.hidden = !content.link;
+    setAuthMessage();
+  }
+
+  function showSignedOutState(message = '') {
+    stopCloudSync();
+    currentUser = null;
+    elements.appShell.hidden = true;
+    elements.authGate.hidden = false;
+    setAuthMode('login');
+    if (message) setAuthMessage(message, 'error');
+  }
+
+  function userDisplayName(user) {
+    return user?.name
+      || user?.userMetadata?.full_name
+      || user?.userMetadata?.name
+      || user?.email
+      || 'User';
+  }
+
+  async function enterUserSession(user) {
+    currentUser = user;
+    configureUserStorage(user);
+    state = loadState();
+    cloudRevision = Number(localStorage.getItem(cloudRevisionStorage)) || 0;
+    cloudPending = localStorage.getItem(cloudPendingStorage) === '1';
+    cloudReady = false;
+    cloudRequestInFlight = false;
+    localChangeVersion = 0;
+
+    elements.currentUserName.textContent = `${userDisplayName(user)} · ${user.email || ''}`.replace(/ · $/, '');
+    elements.authGate.hidden = true;
+    elements.appShell.hidden = false;
+    render();
+    await initializeCloudSync();
+  }
+
+  async function submitLogin(event) {
+    event.preventDefault();
+    const button = elements.loginForm.querySelector('button[type="submit"]');
+    button.disabled = true;
+    setAuthMessage('Signing in…');
+
+    try {
+      await login(elements.loginEmail.value.trim(), elements.loginPassword.value);
+      window.location.reload();
+    } catch (error) {
+      console.warn('Login failed:', error);
+      setAuthMessage(error?.message || 'Could not sign in. Check your email and password.', 'error');
+      button.disabled = false;
+    }
+  }
+
+  async function submitSignup(event) {
+    event.preventDefault();
+    const button = elements.signupForm.querySelector('button[type="submit"]');
+    button.disabled = true;
+    setAuthMessage('Creating account…');
+
+    try {
+      await signup(
+        elements.signupEmail.value.trim(),
+        elements.signupPassword.value,
+        { full_name: elements.signupName.value.trim() }
+      );
+
+      const signedInUser = await getUser();
+      if (signedInUser) {
+        window.location.reload();
+        return;
+      }
+
+      elements.signupForm.reset();
+      setAuthMessage('Account created. Check your email to confirm the registration, then sign in.', 'success');
+    } catch (error) {
+      console.warn('Signup failed:', error);
+      setAuthMessage(error?.message || 'Could not create the account.', 'error');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function submitRecoveryRequest(event) {
+    event.preventDefault();
+    const button = elements.recoveryForm.querySelector('button[type="submit"]');
+    button.disabled = true;
+    setAuthMessage('Sending recovery email…');
+
+    try {
+      await requestPasswordRecovery(elements.recoveryEmail.value.trim());
+      elements.recoveryForm.reset();
+      setAuthMessage('Recovery email sent. Open the link in that message to create a new password.', 'success');
+    } catch (error) {
+      console.warn('Recovery request failed:', error);
+      setAuthMessage(error?.message || 'Could not send the recovery email.', 'error');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function submitPasswordReset(event) {
+    event.preventDefault();
+    const password = elements.resetPassword.value;
+    const confirmation = elements.resetPasswordConfirm.value;
+    const button = elements.resetPasswordForm.querySelector('button[type="submit"]');
+
+    if (password !== confirmation) {
+      setAuthMessage('The passwords do not match.', 'error');
+      return;
+    }
+
+    button.disabled = true;
+    setAuthMessage('Updating password…');
+
+    try {
+      await updateUser({ password });
+      setAuthMessage('Password updated. Loading your dashboard…', 'success');
+      window.location.reload();
+    } catch (error) {
+      console.warn('Password reset failed:', error);
+      setAuthMessage(error?.message || 'Could not update the password.', 'error');
+      button.disabled = false;
+    }
+  }
+
+  async function submitInvite(event) {
+    event.preventDefault();
+    const password = elements.invitePassword.value;
+    const confirmation = elements.invitePasswordConfirm.value;
+    const button = elements.inviteForm.querySelector('button[type="submit"]');
+
+    if (!pendingInviteToken) {
+      setAuthMessage('This invitation token is missing or expired.', 'error');
+      return;
+    }
+
+    if (password !== confirmation) {
+      setAuthMessage('The passwords do not match.', 'error');
+      return;
+    }
+
+    button.disabled = true;
+    setAuthMessage('Activating account…');
+
+    try {
+      await acceptInvite(pendingInviteToken, password);
+      pendingInviteToken = '';
+      setAuthMessage('Invitation accepted. Loading your dashboard…', 'success');
+      window.location.reload();
+    } catch (error) {
+      console.warn('Invite acceptance failed:', error);
+      setAuthMessage(error?.message || 'Could not accept the invitation.', 'error');
+      button.disabled = false;
+    }
+  }
+
+  async function signOutCurrentUser() {
+    const approved = window.confirm('Log out of this account?');
+    if (!approved) return;
+
+    elements.logoutBtn.disabled = true;
+    elements.saveStatus.textContent = 'Logging out…';
+    try {
+      await logout();
+    } finally {
+      window.location.reload();
+    }
+  }
+
+  async function initializeApplication() {
+    elements.appShell.hidden = true;
+    elements.authGate.hidden = false;
+    setAuthMessage('Checking session…');
+
+    try {
+      const callbackResult = await handleAuthCallback();
+      if (callbackResult && window.location.hash) {
+        history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
+      }
+
+      if (callbackResult?.type === 'invite') {
+        pendingInviteToken = callbackResult.token || '';
+        elements.appShell.hidden = true;
+        elements.authGate.hidden = false;
+        setAuthMode('invite');
+        return;
+      }
+
+      if (callbackResult?.type === 'recovery') {
+        currentUser = callbackResult.user;
+        elements.appShell.hidden = true;
+        elements.authGate.hidden = false;
+        setAuthMode('reset');
+        return;
+      }
+
+      const user = callbackResult?.user || await getUser();
+      if (!user) {
+        showSignedOutState();
+        return;
+      }
+
+      await enterUserSession(user);
+    } catch (error) {
+      console.warn('Could not initialize authentication:', error);
+      showSignedOutState(error?.message || 'Authentication is not available. Enable Netlify Identity for this project.');
+    }
+  }
+
   elements.addCounterBtn.addEventListener('click', () => openCounterDialog());
   elements.emptyAddBtn.addEventListener('click', () => openCounterDialog());
   elements.editModeBtn.addEventListener('click', toggleEditMode);
   elements.resetAllBtn.addEventListener('click', resetAll);
-  elements.cloudSyncBtn.addEventListener('click', configureCloudSync);
   elements.exportBtn.addEventListener('click', exportState);
   elements.importInput.addEventListener('change', importState);
   elements.counterForm.addEventListener('submit', upsertCounter);
   elements.closeDialogBtn.addEventListener('click', closeCounterDialog);
   elements.cancelDialogBtn.addEventListener('click', closeCounterDialog);
   elements.appTitle.addEventListener('click', editTitle);
+  elements.loginForm.addEventListener('submit', submitLogin);
+  elements.signupForm.addEventListener('submit', submitSignup);
+  elements.recoveryForm.addEventListener('submit', submitRecoveryRequest);
+  elements.resetPasswordForm.addEventListener('submit', submitPasswordReset);
+  elements.inviteForm.addEventListener('submit', submitInvite);
+  elements.forgotPasswordBtn.addEventListener('click', () => setAuthMode('recovery'));
+  elements.toggleAuthModeBtn.addEventListener('click', () => {
+    if (authMode === 'login') {
+      setAuthMode('signup');
+    } else {
+      setAuthMode('login');
+    }
+  });
+  elements.logoutBtn.addEventListener('click', signOutCurrentUser);
 
   elements.counterDialog.addEventListener('click', (event) => {
     if (event.target === elements.counterDialog) closeCounterDialog();
@@ -905,6 +1181,5 @@
     if (!document.hidden) pullCloudState();
   });
 
-  render();
-  initializeCloudSync();
+  initializeApplication();
 })();

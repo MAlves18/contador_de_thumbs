@@ -8,10 +8,83 @@
   <title>Thumbnail Counter</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="css/styles.css?v=5" />
+  <link rel="stylesheet" href="css/styles.css?v=6" />
 </head>
 <body>
-  <main class="app-shell">
+  <section id="authGate" class="auth-gate" aria-live="polite">
+    <div class="auth-card">
+      <img class="auth-logo" src="assets/logo-jl.svg" alt="JL" />
+      <p class="eyebrow">Private dashboard</p>
+      <h1>Thumbnail Counter</h1>
+      <p id="authIntro" class="auth-intro">Sign in to access your counters on any device.</p>
+
+      <form id="loginForm" class="auth-form">
+        <label>
+          Email
+          <input id="loginEmail" type="email" autocomplete="email" required />
+        </label>
+        <label>
+          Password
+          <input id="loginPassword" type="password" autocomplete="current-password" minlength="6" required />
+        </label>
+        <button class="toolbar-btn primary auth-submit" type="submit">Sign in</button>
+        <button id="forgotPasswordBtn" class="auth-link auth-link-inline" type="button">Forgot password?</button>
+      </form>
+
+      <form id="signupForm" class="auth-form" hidden>
+        <label>
+          Name
+          <input id="signupName" type="text" autocomplete="name" maxlength="80" required />
+        </label>
+        <label>
+          Email
+          <input id="signupEmail" type="email" autocomplete="email" required />
+        </label>
+        <label>
+          Password
+          <input id="signupPassword" type="password" autocomplete="new-password" minlength="6" required />
+        </label>
+        <button class="toolbar-btn primary auth-submit" type="submit">Create account</button>
+      </form>
+
+      <form id="recoveryForm" class="auth-form" hidden>
+        <label>
+          Account email
+          <input id="recoveryEmail" type="email" autocomplete="email" required />
+        </label>
+        <button class="toolbar-btn primary auth-submit" type="submit">Send recovery email</button>
+      </form>
+
+      <form id="resetPasswordForm" class="auth-form" hidden>
+        <label>
+          New password
+          <input id="resetPassword" type="password" autocomplete="new-password" minlength="6" required />
+        </label>
+        <label>
+          Confirm new password
+          <input id="resetPasswordConfirm" type="password" autocomplete="new-password" minlength="6" required />
+        </label>
+        <button class="toolbar-btn primary auth-submit" type="submit">Update password</button>
+      </form>
+
+      <form id="inviteForm" class="auth-form" hidden>
+        <label>
+          Create your password
+          <input id="invitePassword" type="password" autocomplete="new-password" minlength="6" required />
+        </label>
+        <label>
+          Confirm password
+          <input id="invitePasswordConfirm" type="password" autocomplete="new-password" minlength="6" required />
+        </label>
+        <button class="toolbar-btn primary auth-submit" type="submit">Accept invitation</button>
+      </form>
+
+      <button id="toggleAuthModeBtn" class="auth-link" type="button">Create a new account</button>
+      <p id="authMessage" class="auth-message"></p>
+    </div>
+  </section>
+
+  <main id="appShell" class="app-shell" hidden>
     <header class="app-header">
       <div class="title-badge" aria-label="Application title">
         <span id="appTitle">THUMBNAIL COUNTER</span>
@@ -21,10 +94,14 @@
         <button id="addCounterBtn" class="toolbar-btn primary" type="button">+ Add counter</button>
         <button id="editModeBtn" class="toolbar-btn" type="button" aria-pressed="false">Edit mode</button>
         <button id="resetAllBtn" class="toolbar-btn danger" type="button">Reset all</button>
-        <button id="cloudSyncBtn" class="toolbar-btn" type="button" aria-pressed="false">Cloud sync</button>
         <button id="exportBtn" class="toolbar-btn" type="button">Export</button>
         <label class="toolbar-btn file-btn" for="importInput">Import</label>
         <input id="importInput" type="file" accept="application/json" hidden />
+      </div>
+
+      <div class="user-bar" aria-label="Current user">
+        <span id="currentUserName"></span>
+        <button id="logoutBtn" class="toolbar-btn compact" type="button">Log out</button>
       </div>
     </header>
 
@@ -108,6 +185,6 @@
     </article>
   </template>
 
-  <script src="js/app.js?v=5" defer></script>
+  <script type="module" src="js/app.js?v=6"></script>
 </body>
 </html>

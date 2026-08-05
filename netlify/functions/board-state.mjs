@@ -1,8 +1,7 @@
 import { getStore } from '@netlify/blobs';
-import { timingSafeEqual } from 'node:crypto';
+import { getUser } from '@netlify/identity';
 
 const STORE_NAME = 'thumbnail-counter';
-const STATE_KEY = 'shared-dashboard';
 const MAX_BODY_BYTES = 300_000;
 const MAX_COUNTERS = 500;
 
@@ -17,14 +16,6 @@ function json(data, status = 200) {
     status,
     headers: responseHeaders
   });
-}
-
-function secureEquals(left, right) {
-  const leftBuffer = Buffer.from(String(left || ''), 'utf8');
-  const rightBuffer = Buffer.from(String(right || ''), 'utf8');
-
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 function finiteNumber(value, fallback = 0) {
@@ -76,6 +67,12 @@ function sanitizeState(state) {
   };
 }
 
+function stateKeyForUser(user) {
+  const safeId = String(user.id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 160);
+  if (!safeId) throw new Error('Authenticated user has no valid identifier.');
+  return `users/${safeId}/dashboard`;
+}
+
 export default async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response(null, {
@@ -87,20 +84,22 @@ export default async (request) => {
     });
   }
 
-  const configuredSecret = process.env.SYNC_SECRET;
-  if (!configuredSecret) {
-    return json({ error: 'SYNC_SECRET is not configured in Netlify.' }, 503);
+  const user = await getUser();
+  if (!user) {
+    return json({ error: 'Authentication required.' }, 401);
   }
 
-  const suppliedSecret = request.headers.get('x-sync-key');
-  if (!secureEquals(suppliedSecret, configuredSecret)) {
-    return json({ error: 'Invalid cloud sync password.' }, 401);
+  let stateKey;
+  try {
+    stateKey = stateKeyForUser(user);
+  } catch (error) {
+    return json({ error: error.message }, 400);
   }
 
   const store = getStore({ name: STORE_NAME, consistency: 'strong' });
 
   if (request.method === 'GET') {
-    const entry = await store.get(STATE_KEY, { type: 'json' });
+    const entry = await store.get(stateKey, { type: 'json' });
 
     if (!entry) {
       return json({ found: false, revision: 0, state: null });
@@ -134,11 +133,11 @@ export default async (request) => {
       return json({ error: error.message }, 400);
     }
 
-    const current = await store.get(STATE_KEY, { type: 'json' });
+    const current = await store.get(stateKey, { type: 'json' });
     const revision = Math.max(Date.now(), finiteNumber(current?.revision) + 1);
     const savedAt = new Date().toISOString();
 
-    await store.setJSON(STATE_KEY, {
+    await store.setJSON(stateKey, {
       revision,
       savedAt,
       state: cleanState

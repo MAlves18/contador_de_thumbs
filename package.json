@@ -1,13 +1,14 @@
 {
-  "name": "thumbnail-counter",
-  "version": "1.1.0",
+  "name": "thumbnail-counter-users",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Editable counter dashboard with cross-device Netlify cloud sync.",
+  "description": "Editable thumbnail counter with private user accounts and cross-device synchronization on Netlify.",
   "scripts": {
     "dev": "netlify dev"
   },
   "dependencies": {
-    "@netlify/blobs": "10.7.9"
+    "@netlify/blobs": "10.7.9",
+    "@netlify/identity": "1.2.0"
   }
 }
