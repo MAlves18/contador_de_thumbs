@@ -1,4 +1,4 @@
-import { acceptInvite, getUser, handleAuthCallback, login, logout, requestPasswordRecovery, signup, updateUser } from 'https://cdn.jsdelivr.net/npm/@netlify/identity@1.2.0/+esm';
+import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, requestPasswordRecovery, signup, updateUser } from 'https://cdn.jsdelivr.net/npm/@netlify/identity@1.2.0/+esm';
 
 (() => {
   'use strict';
@@ -21,7 +21,15 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, requestPasswo
   const CARD_GAP = 16;
 
   const starterCounters = [
-    
+    { name: 'SIXRING', goal: 10, value: 8, color: '#f5a900' },
+    { name: 'RBT', goal: 10, value: 8, color: '#f5a900' },
+    { name: 'BENGAL', goal: 20, value: 0, color: '#f5a900' },
+    { name: 'KCLUKE', goal: 5, value: 0, color: '#f5a900' },
+    { name: 'FRDI SHOW', goal: 16, value: 0, color: '#f5a900' },
+    { name: 'JAYCANADA', goal: 5, value: 0, color: '#f5a900' },
+    { name: 'PERRAM', goal: 5, value: 0, color: '#f5a900' },
+    { name: 'SIXRING', goal: 10, value: 0, color: '#f5a900' },
+    { name: 'RBT', goal: 10, value: 0, color: '#f5a900' }
   ];
 
   const elements = {
@@ -32,6 +40,8 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, requestPasswo
     loginEmail: document.querySelector('#loginEmail'),
     loginPassword: document.querySelector('#loginPassword'),
     forgotPasswordBtn: document.querySelector('#forgotPasswordBtn'),
+    externalAuth: document.querySelector('#externalAuth'),
+    googleLoginBtn: document.querySelector('#googleLoginBtn'),
     signupForm: document.querySelector('#signupForm'),
     signupName: document.querySelector('#signupName'),
     signupEmail: document.querySelector('#signupEmail'),
@@ -892,6 +902,7 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, requestPasswo
     elements.recoveryForm.hidden = authMode !== 'recovery';
     elements.resetPasswordForm.hidden = authMode !== 'reset';
     elements.inviteForm.hidden = authMode !== 'invite';
+    elements.externalAuth.hidden = !['login', 'signup'].includes(authMode);
 
     const content = {
       login: {
@@ -969,6 +980,19 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, requestPasswo
       console.warn('Login failed:', error);
       setAuthMessage(error?.message || 'Could not sign in. Check your email and password.', 'error');
       button.disabled = false;
+    }
+  }
+
+  function signInWithGoogle() {
+    elements.googleLoginBtn.disabled = true;
+    setAuthMessage('Redirecting to Google…');
+
+    try {
+      oauthLogin('google');
+    } catch (error) {
+      console.warn('Google login failed:', error);
+      setAuthMessage(error?.message || 'Could not start Google sign-in. Check the Google provider configuration in Netlify.', 'error');
+      elements.googleLoginBtn.disabled = false;
     }
   }
 
@@ -1144,6 +1168,7 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, requestPasswo
   elements.resetPasswordForm.addEventListener('submit', submitPasswordReset);
   elements.inviteForm.addEventListener('submit', submitInvite);
   elements.forgotPasswordBtn.addEventListener('click', () => setAuthMode('recovery'));
+  elements.googleLoginBtn.addEventListener('click', signInWithGoogle);
   elements.toggleAuthModeBtn.addEventListener('click', () => {
     if (authMode === 'login') {
       setAuthMode('signup');

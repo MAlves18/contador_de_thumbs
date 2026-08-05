@@ -716,3 +716,65 @@ body.edit-mode .counter-card__edit-actions {
   opacity: 0.62;
   transform: none;
 }
+
+
+/* Google OAuth button */
+.external-auth {
+  display: grid;
+  gap: 14px;
+  margin: 16px 0 2px;
+}
+
+.auth-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  color: #7a8493;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  height: 1px;
+  background: #d8dde5;
+}
+
+.google-login-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 1px solid #c9ced6;
+  border-radius: 9px;
+  color: #263238;
+  background: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  box-shadow: 0 2px 5px rgba(12, 21, 37, 0.08);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.google-login-btn:hover {
+  border-color: #9da6b2;
+  box-shadow: 0 5px 13px rgba(12, 21, 37, 0.12);
+  transform: translateY(-1px);
+}
+
+.google-login-btn:disabled {
+  cursor: wait;
+  opacity: 0.62;
+  transform: none;
+}
+
+.google-login-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}

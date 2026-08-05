@@ -118,3 +118,17 @@ npx netlify dev
 ```
 
 Mesmo usando `netlify dev`, os fluxos de autenticação funcionam melhor em um deploy de teste no Netlify.
+
+
+## Login com Google
+
+O projeto inclui o botão **Continue with Google**. Para ativá-lo no Netlify:
+
+1. Abra `Project configuration > Identity > Registration > External providers`.
+2. Clique em `Add provider`.
+3. Escolha `Google` e salve.
+4. Envie esta versão ao GitHub para o Netlify executar um novo deploy.
+
+Nenhum Client ID, Client Secret ou senha do Google deve ser colocado no `app.js`, no `index.html` ou no GitHub. Por padrão, o Netlify pode usar a integração OAuth dele. Para mostrar o nome da sua própria aplicação na tela de consentimento, configure credenciais próprias diretamente no painel do Netlify.
+
+Se o cadastro estiver em `Invite only`, o endereço Google também precisará ser convidado antes do primeiro acesso.
