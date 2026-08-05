@@ -21,15 +21,7 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, requestPasswo
   const CARD_GAP = 16;
 
   const starterCounters = [
-    { name: 'SIXRING', goal: 10, value: 8, color: '#f5a900' },
-    { name: 'RBT', goal: 10, value: 8, color: '#f5a900' },
-    { name: 'BENGAL', goal: 20, value: 0, color: '#f5a900' },
-    { name: 'KCLUKE', goal: 5, value: 0, color: '#f5a900' },
-    { name: 'FRDI SHOW', goal: 16, value: 0, color: '#f5a900' },
-    { name: 'JAYCANADA', goal: 5, value: 0, color: '#f5a900' },
-    { name: 'PERRAM', goal: 5, value: 0, color: '#f5a900' },
-    { name: 'SIXRING', goal: 10, value: 0, color: '#f5a900' },
-    { name: 'RBT', goal: 10, value: 0, color: '#f5a900' }
+    
   ];
 
   const elements = {
