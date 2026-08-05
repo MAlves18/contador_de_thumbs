@@ -98,7 +98,7 @@ Git e GitHub
 
 Estrutura do projeto
 
-.
+
 ├── assets/
 │   ├── favicon.png
 │   ├── favicon.svg
