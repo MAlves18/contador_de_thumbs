@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f5a900" />
+  <meta name="description" content="Editable and freely draggable thumbnail counter dashboard" />
+  <title>Thumbnail Counter</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="css/styles.css?v=6" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div class="title-badge" aria-label="Application title">
+        <span id="appTitle">THUMBNAIL COUNTER</span>
+      </div>
+
+      <div class="toolbar" aria-label="Counter controls">
+        <button id="addCounterBtn" class="toolbar-btn primary" type="button">+ Add counter</button>
+        <button id="editModeBtn" class="toolbar-btn" type="button" aria-pressed="false">Edit mode</button>
+        <button id="resetAllBtn" class="toolbar-btn danger" type="button">Reset all</button>
+        <button id="exportBtn" class="toolbar-btn" type="button">Export</button>
+        <label class="toolbar-btn file-btn" for="importInput">Import</label>
+        <input id="importInput" type="file" accept="application/json" hidden />
+      </div>
+    </header>
+
+    <section class="status-row" aria-live="polite">
+      <p id="summaryText">0 counters · 0 total</p>
+      <p id="saveStatus">Saved automatically</p>
+    </section>
+
+    <section id="counterGrid" class="counter-board" aria-label="Editable counters positioned freely across the full screen"></section>
+
+    <section id="emptyState" class="empty-state" hidden>
+      <h2>No counters yet</h2>
+      <p>Create your first counter and start tracking.</p>
+      <button id="emptyAddBtn" class="toolbar-btn primary" type="button">Create counter</button>
+    </section>
+  </main>
+
+  <dialog id="counterDialog" class="counter-dialog">
+    <form id="counterForm" method="dialog">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">Counter settings</p>
+          <h2 id="dialogTitle">Add counter</h2>
+        </div>
+        <button id="closeDialogBtn" class="icon-btn" type="button" aria-label="Close dialog">×</button>
+      </div>
+
+      <input id="counterId" type="hidden" />
+
+      <label>
+        Name
+        <input id="counterName" type="text" maxlength="26" placeholder="Example: SIXRING" required />
+      </label>
+
+      <div class="form-grid">
+        <label>
+          Goal
+          <input id="counterGoal" type="number" min="0" step="1" value="10" required />
+        </label>
+
+        <label>
+          Current value
+          <input id="counterValue" type="number" min="0" step="1" value="0" required />
+        </label>
+      </div>
+
+      <label>
+        Accent color
+        <input id="counterColor" type="color" value="#f5a900" />
+      </label>
+
+      <div class="dialog-actions">
+        <button id="cancelDialogBtn" class="toolbar-btn" type="button">Cancel</button>
+        <button class="toolbar-btn primary" type="submit">Save counter</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="counterCardTemplate">
+    <article class="counter-card" tabindex="0">
+      <div class="counter-card__screen" title="Drag here across the whole screen while edit mode is active">
+        <div class="counter-card__topline">
+          <span class="drag-handle" aria-hidden="true">⠿</span>
+          <h2 class="counter-card__title"></h2>
+          <button class="card-edit-btn" type="button" aria-label="Edit counter">✎</button>
+        </div>
+        <p class="counter-card__value" aria-live="polite"></p>
+        <div class="progress-track" aria-hidden="true">
+          <span class="progress-bar"></span>
+        </div>
+      </div>
+
+      <div class="counter-card__controls">
+        <button class="count-btn minus-btn" type="button" aria-label="Decrease counter">−</button>
+        <button class="count-btn plus-btn" type="button" aria-label="Increase counter">+</button>
+      </div>
+
+      <div class="counter-card__edit-actions">
+        <button class="small-action duplicate-btn" type="button">Duplicate</button>
+        <button class="small-action delete-btn" type="button">Delete</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="js/app.js?v=6" defer></script>
+</body>
+</html>
