@@ -20,7 +20,7 @@ O Thumbnail Counter é um painel para criar e acompanhar contadores personalizad
 
 O projeto utiliza autenticação individual. Cada conta possui um painel privado, salvo separadamente no Netlify Blobs por meio de uma Netlify Function.
 
-Demonstração: substitua o endereço abaixo pela URL do seu site publicado.
+Demonstração:
 
 https://courageous-elf-7f33e6.netlify.app/
 
