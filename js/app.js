@@ -530,7 +530,7 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
     const total = state.counters.reduce((sum, counter) => sum + counter.value, 0);
     elements.summaryText.textContent = `${state.counters.length} counter${state.counters.length === 1 ? '' : 's'} · ${total} total`;
     if (state.editMode) {
-      elements.saveStatus.textContent = 'Edit mode: drag counters anywhere on the screen';
+      elements.saveStatus.textContent = 'Edit mode: edit, duplicate or delete counters';
     } else if (cloudReady) {
       elements.saveStatus.textContent = cloudPending ? 'Saving to cloud…' : 'Synced across devices';
     } else {
@@ -559,6 +559,8 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
     const percentage = counter.goal > 0 ? Math.min(100, (counter.value / counter.goal) * 100) : 0;
 
     card.dataset.id = counter.id;
+    card.tabIndex = 0;
+    card.setAttribute('aria-label', `${counter.name} counter. Drag to reposition.`);
     card.style.setProperty('--card-accent', counter.color);
     title.textContent = `${counter.name} (${counter.goal})`;
     value.textContent = counter.value;
@@ -741,7 +743,7 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
   }
 
   function beginDrag(event, id, card) {
-    if (!state.editMode || event.target.closest('button')) return;
+    if (event.target.closest('button')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
 
     const counter = state.counters.find((item) => item.id === id);
@@ -799,7 +801,7 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
 
   function moveWithKeyboard(event, id) {
     if (event.target.closest('button')) return;
-    if (!state.editMode || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
 
     event.preventDefault();
     const counter = state.counters.find((item) => item.id === id);

@@ -1,13 +1,38 @@
 :root {
+  color-scheme: light;
   --ink: #0c1525;
   --ink-soft: #172235;
   --paper: #f7f7f3;
   --paper-strong: #ffffff;
   --accent: #f5a900;
   --danger: #b42318;
-  --shadow: 0 14px 30px rgba(21, 15, 9, 0.24);
+  --shadow: 0 14px 30px rgba(5, 9, 16, 0.28);
   --radius: 10px;
   --card-width: 140px;
+  --board-bg: #ffffff;
+  --grid-minor: rgba(15, 23, 42, 0.075);
+  --grid-major: rgba(15, 23, 42, 0.14);
+  --board-vignette: rgba(15, 23, 42, 0.035);
+  --board-text: rgba(12, 21, 37, 0.84);
+  --board-glass: rgba(255, 255, 255, 0.78);
+  --board-glass-strong: rgba(255, 255, 255, 0.9);
+  --board-outline: rgba(12, 21, 37, 0.18);
+  --edit-overlay: rgba(15, 23, 42, 0.025);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --board-bg: #090b0e;
+    --grid-minor: rgba(255, 255, 255, 0.055);
+    --grid-major: rgba(255, 255, 255, 0.12);
+    --board-vignette: rgba(0, 0, 0, 0.3);
+    --board-text: rgba(255, 255, 255, 0.88);
+    --board-glass: rgba(17, 21, 27, 0.8);
+    --board-glass-strong: rgba(17, 21, 27, 0.92);
+    --board-outline: rgba(255, 255, 255, 0.17);
+    --edit-overlay: rgba(255, 255, 255, 0.025);
+  }
 }
 
 * {
@@ -27,29 +52,24 @@ body {
   margin: 0;
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background-color: #bd8658;
+  background-color: var(--board-bg);
   background-image:
-    radial-gradient(circle at 20% 15%, rgba(255,255,255,.13) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 70% 45%, rgba(65,35,14,.16) 0 1px, transparent 1.6px),
-    radial-gradient(circle at 42% 80%, rgba(255,255,255,.11) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 88% 10%, rgba(65,35,14,.13) 0 1px, transparent 1.6px),
-    linear-gradient(135deg, rgba(255,255,255,.04), rgba(0,0,0,.04));
-  background-size: 13px 13px, 17px 17px, 19px 19px, 23px 23px, 100% 100%;
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+  background-position: -1px -1px;
+  background-size: 120px 120px, 120px 120px, 20px 20px, 20px 20px;
 }
 
-/* Central watermark on the corkboard background. */
+/* Soft vignette over the square grid, inspired by the supplied reference. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background-image: url("../assets/logo-jl.svg");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: min(54vw, 620px) auto;
-  opacity: 0.09;
-  filter: contrast(0.85);
+  background: radial-gradient(circle at 50% 42%, transparent 0 48%, var(--board-vignette) 100%);
 }
 
 body.is-dragging {
@@ -170,7 +190,7 @@ body.edit-mode .title-badge span {
   gap: 16px;
   width: min(1120px, 100%);
   margin: 16px auto 8px;
-  color: rgba(12, 21, 37, 0.78);
+  color: var(--board-text);
   font-size: .86rem;
   font-weight: 750;
 }
@@ -192,8 +212,8 @@ body.edit-mode .title-badge span {
 }
 
 body.edit-mode .counter-board {
-  background: rgba(255, 255, 255, .035);
-  box-shadow: inset 0 0 0 2px rgba(12, 21, 37, .10);
+  background: var(--edit-overlay);
+  box-shadow: inset 0 0 0 2px var(--board-outline);
 }
 
 /* While dragging, the active card can visually pass over the header. */
@@ -253,9 +273,14 @@ body.is-dragging .counter-board {
   background: linear-gradient(160deg, #111b2d 0%, #0b1423 100%);
 }
 
-body.edit-mode .counter-card__screen {
+.counter-card__screen {
   cursor: grab;
   touch-action: none;
+  user-select: none;
+}
+
+.counter-card__screen:active {
+  cursor: grabbing;
 }
 
 .counter-card__topline {
@@ -400,10 +425,12 @@ body.edit-mode .counter-card__edit-actions {
   width: min(560px, 100%);
   margin: 64px auto 0;
   padding: 32px;
-  border: 2px dashed rgba(12,21,37,.34);
+  border: 2px dashed var(--board-outline);
   border-radius: 14px;
+  color: var(--board-text);
   text-align: center;
-  background: rgba(255,255,255,.35);
+  background: var(--board-glass);
+  backdrop-filter: blur(8px);
 }
 
 .empty-state h2 {
@@ -546,11 +573,23 @@ body.edit-mode .counter-card__edit-actions {
   }
 }
 
-/* Keep the watermark balanced on narrow screens. */
-@media (max-width: 640px) {
-  body::before {
-    background-size: min(76vw, 430px) auto;
-    opacity: 0.075;
+@media (prefers-color-scheme: dark) {
+  .toolbar-btn:not(.primary):not(.danger),
+  .file-btn {
+    color: #f4f6f8;
+    background: var(--board-glass-strong);
+    border-color: var(--board-outline);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+  }
+
+  .toolbar-btn:not(.primary):not(.danger):hover,
+  .file-btn:hover {
+    background: rgba(35, 41, 50, 0.96);
+  }
+
+  .empty-state h2,
+  .empty-state p {
+    color: var(--board-text);
   }
 }
 
@@ -673,9 +712,11 @@ body.edit-mode .counter-card__edit-actions {
   max-width: calc(100vw - 24px);
   padding: 6px 8px 6px 12px;
   border-radius: 999px;
-  color: rgba(12, 21, 37, 0.86);
-  background: rgba(255, 255, 255, 0.66);
-  box-shadow: 0 4px 12px rgba(50, 32, 16, 0.1);
+  color: var(--board-text);
+  background: var(--board-glass);
+  border: 1px solid var(--board-outline);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(9px);
   font-size: 0.78rem;
   font-weight: 800;
 }
