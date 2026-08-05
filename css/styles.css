@@ -553,3 +553,10 @@ body.edit-mode .counter-card__edit-actions {
     opacity: 0.075;
   }
 }
+
+/* Cloud synchronization state. */
+.toolbar-btn.cloud-connected {
+  color: #ffffff;
+  background: #157347;
+  border-color: rgba(10, 92, 55, 0.5);
+}

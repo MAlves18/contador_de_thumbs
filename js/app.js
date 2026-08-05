@@ -2,6 +2,12 @@
   'use strict';
 
   const STORAGE_KEY = 'thumbnail-counter-state-v1';
+  const CLOUD_KEY_STORAGE = 'thumbnail-counter-cloud-key-v1';
+  const CLOUD_REVISION_STORAGE = 'thumbnail-counter-cloud-revision-v1';
+  const CLOUD_PENDING_STORAGE = 'thumbnail-counter-cloud-pending-v1';
+  const CLOUD_ENDPOINT = '/api/board-state';
+  const CLOUD_SAVE_DELAY_MS = 450;
+  const CLOUD_POLL_INTERVAL_MS = 15000;
   const COORDINATE_SPACE = 'viewport-relative-v2';
   const PREVIOUS_VIEWPORT_SPACE = 'viewport-v1';
   const LEGACY_BOARD_WIDTH = 1120;
@@ -28,6 +34,7 @@
     emptyAddBtn: document.querySelector('#emptyAddBtn'),
     editModeBtn: document.querySelector('#editModeBtn'),
     resetAllBtn: document.querySelector('#resetAllBtn'),
+    cloudSyncBtn: document.querySelector('#cloudSyncBtn'),
     exportBtn: document.querySelector('#exportBtn'),
     importInput: document.querySelector('#importInput'),
     counterGrid: document.querySelector('#counterGrid'),
@@ -51,6 +58,14 @@
   let needsMigrationSave = false;
   let state = loadState();
   let dragState = null;
+  let cloudSyncKey = localStorage.getItem(CLOUD_KEY_STORAGE) || '';
+  let cloudRevision = Number(localStorage.getItem(CLOUD_REVISION_STORAGE)) || 0;
+  let cloudReady = false;
+  let cloudSaveTimer = null;
+  let cloudPollTimer = null;
+  let cloudRequestInFlight = false;
+  let cloudPending = localStorage.getItem(CLOUD_PENDING_STORAGE) === '1';
+  let localChangeVersion = 0;
 
   function createId() {
     return typeof crypto.randomUUID === 'function'
@@ -189,10 +204,240 @@
     }
   }
 
-  function saveState(message = 'Saved automatically') {
+  function setCloudPending(value) {
+    cloudPending = Boolean(value);
+    if (cloudPending) {
+      localStorage.setItem(CLOUD_PENDING_STORAGE, '1');
+    } else {
+      localStorage.removeItem(CLOUD_PENDING_STORAGE);
+    }
+  }
+
+  function updateCloudButton() {
+    const connected = Boolean(cloudSyncKey && cloudReady);
+    elements.cloudSyncBtn.textContent = connected ? 'Cloud: on' : 'Cloud sync';
+    elements.cloudSyncBtn.setAttribute('aria-pressed', String(connected));
+    elements.cloudSyncBtn.classList.toggle('cloud-connected', connected);
+  }
+
+  function saveState(message = 'Saved automatically', options = {}) {
+    const { skipCloud = false } = options;
     state.coordinateSpace = COORDINATE_SPACE;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     elements.saveStatus.textContent = message;
+
+    if (!skipCloud && cloudSyncKey) {
+      localChangeVersion += 1;
+      setCloudPending(true);
+      if (cloudReady) scheduleCloudSave();
+    }
+  }
+
+  function normalizeExternalState(importedState) {
+    const sourceCoordinateSpace = typeof importedState?.coordinateSpace === 'string'
+      ? importedState.coordinateSpace
+      : 'legacy-board';
+    const counters = Array.isArray(importedState?.counters) ? importedState.counters : [];
+
+    return {
+      title: typeof importedState?.title === 'string' && importedState.title.trim()
+        ? importedState.title.trim().slice(0, 36)
+        : 'THUMBNAIL COUNTER',
+      editMode: false,
+      coordinateSpace: COORDINATE_SPACE,
+      counters: counters.map((counter, index) => normalizeCounter(counter, index, sourceCoordinateSpace))
+    };
+  }
+
+  async function cloudRequest(method, body = null) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const response = await fetch(CLOUD_ENDPOINT, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Sync-Key': cloudSyncKey
+        },
+        body: body ? JSON.stringify(body) : null,
+        cache: 'no-store',
+        signal: controller.signal
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(result.error || `Cloud request failed (${response.status})`);
+        error.status = response.status;
+        throw error;
+      }
+
+      return result;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  function scheduleCloudSave() {
+    if (!cloudSyncKey || !cloudReady) return;
+    window.clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = window.setTimeout(() => pushCloudState(), CLOUD_SAVE_DELAY_MS);
+    elements.saveStatus.textContent = 'Saving to cloud…';
+  }
+
+  async function pushCloudState() {
+    if (!cloudSyncKey || !cloudReady || !cloudPending) return;
+    if (cloudRequestInFlight) {
+      scheduleCloudSave();
+      return;
+    }
+
+    cloudRequestInFlight = true;
+    window.clearTimeout(cloudSaveTimer);
+    const versionBeingSaved = localChangeVersion;
+
+    try {
+      const result = await cloudRequest('PUT', {
+        state: {
+          title: state.title,
+          editMode: false,
+          coordinateSpace: COORDINATE_SPACE,
+          counters: state.counters
+        }
+      });
+
+      cloudRevision = Number(result.revision) || cloudRevision;
+      localStorage.setItem(CLOUD_REVISION_STORAGE, String(cloudRevision));
+
+      if (localChangeVersion === versionBeingSaved) {
+        setCloudPending(false);
+        elements.saveStatus.textContent = 'Synced across devices';
+      } else {
+        setCloudPending(true);
+        scheduleCloudSave();
+      }
+    } catch (error) {
+      console.warn('Cloud save failed:', error);
+      elements.saveStatus.textContent = error.status === 401
+        ? 'Cloud password rejected'
+        : 'Saved here · retrying cloud sync';
+      if (error.status !== 401 && cloudSyncKey && cloudReady) {
+        window.clearTimeout(cloudSaveTimer);
+        cloudSaveTimer = window.setTimeout(pushCloudState, 5000);
+      }
+    } finally {
+      cloudRequestInFlight = false;
+    }
+  }
+
+  async function pullCloudState() {
+    if (!cloudSyncKey || !cloudReady || cloudRequestInFlight || cloudPending) return;
+    if (dragState || elements.counterDialog.open || document.hidden) return;
+
+    cloudRequestInFlight = true;
+    try {
+      const result = await cloudRequest('GET');
+      const remoteRevision = Number(result.revision) || 0;
+
+      if (result.found && result.state && remoteRevision > cloudRevision) {
+        state = normalizeExternalState(result.state);
+        cloudRevision = remoteRevision;
+        localStorage.setItem(CLOUD_REVISION_STORAGE, String(cloudRevision));
+        saveState('Updated from cloud', { skipCloud: true });
+        render();
+        elements.saveStatus.textContent = 'Updated from another device';
+      }
+    } catch (error) {
+      console.warn('Cloud refresh failed:', error);
+      elements.saveStatus.textContent = error.status === 401
+        ? 'Cloud password rejected'
+        : 'Cloud temporarily unavailable';
+    } finally {
+      cloudRequestInFlight = false;
+    }
+  }
+
+  function startCloudPolling() {
+    window.clearInterval(cloudPollTimer);
+    cloudPollTimer = window.setInterval(pullCloudState, CLOUD_POLL_INTERVAL_MS);
+  }
+
+  async function initializeCloudSync() {
+    updateCloudButton();
+    if (!cloudSyncKey || cloudRequestInFlight) return;
+
+    cloudReady = false;
+    cloudRequestInFlight = true;
+    elements.saveStatus.textContent = 'Connecting to cloud…';
+
+    try {
+      const result = await cloudRequest('GET');
+      cloudRequestInFlight = false;
+      cloudReady = true;
+      updateCloudButton();
+
+      if (result.found && result.state) {
+        if (cloudPending) {
+          await pushCloudState();
+        } else {
+          state = normalizeExternalState(result.state);
+          cloudRevision = Number(result.revision) || 0;
+          localStorage.setItem(CLOUD_REVISION_STORAGE, String(cloudRevision));
+          saveState('Loaded from cloud', { skipCloud: true });
+          render();
+          elements.saveStatus.textContent = 'Cloud data loaded';
+        }
+      } else {
+        setCloudPending(true);
+        await pushCloudState();
+      }
+
+      startCloudPolling();
+    } catch (error) {
+      cloudRequestInFlight = false;
+      cloudReady = false;
+      updateCloudButton();
+      console.warn('Cloud connection failed:', error);
+      elements.saveStatus.textContent = error.status === 401
+        ? 'Cloud password rejected — click Cloud sync'
+        : 'Local mode · cloud not configured';
+    }
+  }
+
+  function disconnectCloudSync() {
+    cloudSyncKey = '';
+    cloudReady = false;
+    cloudRevision = 0;
+    window.clearTimeout(cloudSaveTimer);
+    window.clearInterval(cloudPollTimer);
+    localStorage.removeItem(CLOUD_KEY_STORAGE);
+    localStorage.removeItem(CLOUD_REVISION_STORAGE);
+    setCloudPending(false);
+    updateCloudButton();
+    elements.saveStatus.textContent = 'Cloud disconnected · saved on this device';
+  }
+
+  async function configureCloudSync() {
+    const promptText = cloudSyncKey
+      ? 'Enter a new cloud sync password. Leave blank to disconnect this device.'
+      : 'Enter the cloud sync password configured in Netlify.';
+    const nextKey = window.prompt(promptText);
+    if (nextKey === null) return;
+
+    const cleanedKey = nextKey.trim();
+    if (!cleanedKey) {
+      disconnectCloudSync();
+      return;
+    }
+
+    cloudSyncKey = cleanedKey;
+    cloudRevision = 0;
+    cloudReady = false;
+    setCloudPending(false);
+    localStorage.setItem(CLOUD_KEY_STORAGE, cloudSyncKey);
+    localStorage.removeItem(CLOUD_REVISION_STORAGE);
+    updateCloudButton();
+    await initializeCloudSync();
   }
 
   function clamp(value, minimum, maximum) {
@@ -267,13 +512,20 @@
 
     const total = state.counters.reduce((sum, counter) => sum + counter.value, 0);
     elements.summaryText.textContent = `${state.counters.length} counter${state.counters.length === 1 ? '' : 's'} · ${total} total`;
-    elements.saveStatus.textContent = state.editMode
-      ? 'Edit mode: drag counters anywhere on the screen'
-      : 'Saved automatically';
+    updateCloudButton();
+    if (state.editMode) {
+      elements.saveStatus.textContent = 'Edit mode: drag counters anywhere on the screen';
+    } else if (cloudSyncKey && cloudReady) {
+      elements.saveStatus.textContent = cloudPending ? 'Saving to cloud…' : 'Synced across devices';
+    } else if (cloudSyncKey) {
+      elements.saveStatus.textContent = 'Connecting to cloud…';
+    } else {
+      elements.saveStatus.textContent = 'Saved on this device';
+    }
 
     if (needsMigrationSave) {
       needsMigrationSave = false;
-      saveState('Positions upgraded and saved');
+      saveState('Positions upgraded and saved', { skipCloud: true });
     }
   }
 
@@ -557,7 +809,7 @@
   function exportState() {
     const exportData = {
       app: 'Thumbnail Counter',
-      version: 4,
+      version: 5,
       exportedAt: new Date().toISOString(),
       state: {
         title: state.title,
@@ -625,6 +877,7 @@
   elements.emptyAddBtn.addEventListener('click', () => openCounterDialog());
   elements.editModeBtn.addEventListener('click', toggleEditMode);
   elements.resetAllBtn.addEventListener('click', resetAll);
+  elements.cloudSyncBtn.addEventListener('click', configureCloudSync);
   elements.exportBtn.addEventListener('click', exportState);
   elements.importInput.addEventListener('change', importState);
   elements.counterForm.addEventListener('submit', upsertCounter);
@@ -647,5 +900,11 @@
     }
   });
 
+  window.addEventListener('focus', pullCloudState);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) pullCloudState();
+  });
+
   render();
+  initializeCloudSync();
 })();

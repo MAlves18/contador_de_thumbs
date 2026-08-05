@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#f5a900" />
-  <meta name="description" content="Editable and freely draggable thumbnail counter dashboard" />
+  <meta name="description" content="Editable thumbnail counter dashboard" />
   <title>Thumbnail Counter</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="css/styles.css?v=6" />
+  <link rel="stylesheet" href="css/styles.css?v=5" />
 </head>
 <body>
   <main class="app-shell">
@@ -21,6 +21,7 @@
         <button id="addCounterBtn" class="toolbar-btn primary" type="button">+ Add counter</button>
         <button id="editModeBtn" class="toolbar-btn" type="button" aria-pressed="false">Edit mode</button>
         <button id="resetAllBtn" class="toolbar-btn danger" type="button">Reset all</button>
+        <button id="cloudSyncBtn" class="toolbar-btn" type="button" aria-pressed="false">Cloud sync</button>
         <button id="exportBtn" class="toolbar-btn" type="button">Export</button>
         <label class="toolbar-btn file-btn" for="importInput">Import</label>
         <input id="importInput" type="file" accept="application/json" hidden />
@@ -32,7 +33,7 @@
       <p id="saveStatus">Saved automatically</p>
     </section>
 
-    <section id="counterGrid" class="counter-board" aria-label="Editable counters positioned freely across the full screen"></section>
+    <section id="counterGrid" class="counter-grid counter-board" aria-label="Editable counters"></section>
 
     <section id="emptyState" class="empty-state" hidden>
       <h2>No counters yet</h2>
@@ -83,10 +84,9 @@
   </dialog>
 
   <template id="counterCardTemplate">
-    <article class="counter-card" tabindex="0">
-      <div class="counter-card__screen" title="Drag here across the whole screen while edit mode is active">
+    <article class="counter-card">
+      <div class="counter-card__screen">
         <div class="counter-card__topline">
-          <span class="drag-handle" aria-hidden="true">⠿</span>
           <h2 class="counter-card__title"></h2>
           <button class="card-edit-btn" type="button" aria-label="Edit counter">✎</button>
         </div>
@@ -108,6 +108,6 @@
     </article>
   </template>
 
-  <script src="js/app.js?v=6" defer></script>
+  <script src="js/app.js?v=5" defer></script>
 </body>
 </html>
