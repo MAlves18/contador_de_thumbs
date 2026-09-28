@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo-jl.svg" alt="Logo JL" width="110" />
+  <img src="assets/logo.svg" alt="Logo IMA" width="110" />
 
 Thumbnail Counter
 
