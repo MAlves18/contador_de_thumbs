@@ -1,4 +1,4 @@
-import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, requestPasswordRecovery, signup, updateUser } from 'https://cdn.jsdelivr.net/npm/@netlify/identity@1.2.0/+esm';
+import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, refreshSession, onAuthChange, requestPasswordRecovery, signup, updateUser } from 'https://cdn.jsdelivr.net/npm/@netlify/identity@1.2.0/+esm';
 
 (() => {
   'use strict';
@@ -1135,6 +1135,7 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
     if (!currentUser || sessionCheckInFlight || document.hidden) return;
     sessionCheckInFlight = true;
     try {
+      await refreshSession();
       const user = await getUser();
       if (user) {
         currentUser = user;
@@ -1176,6 +1177,9 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
         return;
       }
 
+      // Recover persisted credentials after a browser restart before cloud requests.
+      // Netlify Identity manages its own cookies and refresh tokens.
+      if (!callbackResult?.user) await refreshSession();
       const user = callbackResult?.user || await getUser();
       if (!user) {
         showSignedOutState();
@@ -1240,6 +1244,18 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
   window.addEventListener('resize', repositionCardsForViewport, { passive: true });
   window.addEventListener('orientationchange', repositionCardsForViewport, { passive: true });
   window.visualViewport?.addEventListener('resize', repositionCardsForViewport, { passive: true });
+
+  // Sync explicit sign-out and account changes across tabs without storing tokens ourselves.
+  onAuthChange((event, user) => {
+    if (event === 'logout') {
+      showSignedOutState();
+    } else if ((event === 'login' || event === 'token_refresh' || event === 'user_updated') && user && currentUser?.id === user.id) {
+      currentUser = user;
+      elements.currentUserName.textContent = `${userDisplayName(user)} · ${user.email || ''}`.replace(/ · $/, '');
+    } else if (event === 'login' && user && !currentUser && !pendingInviteToken && authMode === 'login') {
+      void enterUserSession(user);
+    }
+  });
 
   window.setInterval(revalidatePersistedSession, SESSION_CHECK_INTERVAL_MS);
   window.addEventListener('focus', () => {

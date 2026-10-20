@@ -118,3 +118,9 @@ Estrutura do projeto
 ├── package.json
 └── README.md
 </pre>
+
+## Login persistente entre sessões
+
+O aplicativo restaura a sessão automaticamente ao abrir o navegador novamente, usando os cookies e tokens de renovação gerenciados pelo `@netlify/identity`. Antes de carregar o painel, tenta renovar o token. Também verifica a sessão a cada 5 minutos, ao voltar à aba e sincroniza logout entre abas.
+
+**Limitações:** a sessão não é permanente se o usuário sair explicitamente, limpar os dados do site, usar navegação privada ou se o token de renovação expirar/for revogado. Teste em um deploy Netlify, com cookies permitidos.
