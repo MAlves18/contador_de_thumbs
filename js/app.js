@@ -75,6 +75,8 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
     template: document.querySelector('#counterCardTemplate')
   };
 
+  const SESSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+  let sessionCheckInFlight = false;
   let currentUser = null;
   let authMode = 'login';
   let pendingInviteToken = '';
@@ -1127,6 +1129,26 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
     }
   }
 
+  // Revalidate the persisted Netlify Identity session without storing passwords
+  // or access tokens in application-managed storage.
+  async function revalidatePersistedSession() {
+    if (!currentUser || sessionCheckInFlight || document.hidden) return;
+    sessionCheckInFlight = true;
+    try {
+      const user = await getUser();
+      if (user) {
+        currentUser = user;
+        elements.currentUserName.textContent = `${userDisplayName(user)} · ${user.email || ''}`.replace(/ · $/, '');
+      }
+      // Do not log out on transient network failures or null during refresh.
+      // Protected API endpoints remain responsible for rejecting invalid sessions.
+    } catch (error) {
+      console.warn('Session check will be retried:', error);
+    } finally {
+      sessionCheckInFlight = false;
+    }
+  }
+
   async function initializeApplication() {
     elements.appShell.hidden = true;
     elements.authGate.hidden = false;
@@ -1219,9 +1241,16 @@ import { acceptInvite, getUser, handleAuthCallback, login, logout, oauthLogin, r
   window.addEventListener('orientationchange', repositionCardsForViewport, { passive: true });
   window.visualViewport?.addEventListener('resize', repositionCardsForViewport, { passive: true });
 
-  window.addEventListener('focus', pullCloudState);
+  window.setInterval(revalidatePersistedSession, SESSION_CHECK_INTERVAL_MS);
+  window.addEventListener('focus', () => {
+    revalidatePersistedSession();
+    pullCloudState();
+  });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) pullCloudState();
+    if (!document.hidden) {
+      revalidatePersistedSession();
+      pullCloudState();
+    }
   });
 
   initializeApplication();
